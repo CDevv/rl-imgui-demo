@@ -35,6 +35,7 @@ int main()
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.WantTextInput = true;
 
 	io.Fonts->Clear();
 	io.Fonts->AddFontFromFileTTF("./Karla-Regular.ttf", 15.0f);

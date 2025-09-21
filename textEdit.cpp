@@ -1,4 +1,5 @@
 #include "textEdit.hpp"
+#include <cstdio>
 
 TextEdit::TextEdit() 
 {
@@ -6,6 +7,7 @@ TextEdit::TextEdit()
 	this->lines = std::vector<Line>{};
 	//resetCursor();
 	this->cursorPos = IntVec2 { 3, 1 };
+	this->debounce = 0.05f;
 
 	pushLine("Hello1");
 	pushLine("Hello2");
@@ -38,13 +40,139 @@ char TextEdit::getCurrentChar()
 	return getCharAt(cursorPos.x);
 }
 
+void TextEdit::putChar(char c)
+{
+	int currentLine = cursorPos.y;
+	lines.at(currentLine).content.insert(cursorPos.x, TextFormat("%c", c));
+	cursorPos.x++;
+}
+
+void TextEdit::eraseChar(int index)
+{
+	int currentLine = cursorPos.y;
+	lines.at(currentLine).content.erase(index, 1);
+}
+
+void TextEdit::eraseCurrentLine()
+{
+	int contentSize = lines.at(cursorPos.y).content.size(); 
+	lines.at(cursorPos.y - 1).content.append(
+		lines.at(cursorPos.y).content
+	);
+	lines.erase(lines.begin() + cursorPos.y);
+	cursorPos.y--;
+	cursorPos.x = getLastCharIndex() - contentSize;
+}
+
+void TextEdit::fitCursorInLine()
+{
+	int lineContentSize = lines.at(cursorPos.y).content.size();
+	if (cursorPos.x > lineContentSize) {
+		cursorPos.x = lineContentSize;
+	}
+}
+
+int TextEdit::getLastCharIndex()
+{
+	return lines.at(cursorPos.y).content.size();
+}
+
+void TextEdit::handleCharInput()
+{
+	ImGuiIO& io = ImGui::GetIO();
+
+	if (io.InputQueueCharacters.Size > 0) {
+		for (int i = 0; i < io.InputQueueCharacters.Size; i++) {
+			if (io.InputQueueCharacters[i] < 255) {
+				putChar(static_cast<char>(io.InputQueueCharacters[i]));
+			}
+		}
+	}
+}
+
+void TextEdit::handleKeyInput()
+{
+	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow)) {
+		if (debounce < 0) {
+			if (cursorPos.x > 0) {
+				cursorPos.x--;
+			} else {
+				if (cursorPos.y > 0 && cursorPos.x == 0) {
+					cursorPos.y--;
+					cursorPos.x = getLastCharIndex();
+				}
+			}
+			debounce = 0.05f;
+		} else {
+			debounce -= ImGui::GetIO().DeltaTime;
+		}
+	}
+
+	if (ImGui::IsKeyDown(ImGuiKey_RightArrow)) {
+		if (debounce < 0) {
+			if (cursorPos.x < lines.at(cursorPos.y).content.size()) {
+				cursorPos.x++;
+			} else {
+				if (cursorPos.y < (lines.size() - 1) && cursorPos.x == getLastCharIndex()) {
+					cursorPos.y++;
+					cursorPos.x = 0;
+				}
+			}
+			debounce = 0.05f;
+		} else {
+			debounce -= ImGui::GetIO().DeltaTime;
+		}
+	}
+
+	if (ImGui::IsKeyDown(ImGuiKey_UpArrow)) {
+		if (debounce < 0) {
+			if (cursorPos.y > 0) {
+				cursorPos.y--;
+				fitCursorInLine();
+			}
+			debounce = 0.05f;
+		} else {
+			debounce -= ImGui::GetIO().DeltaTime;
+		}
+	}
+
+	if (ImGui::IsKeyDown(ImGuiKey_DownArrow)) {
+		if (debounce < 0) {
+			if (cursorPos.y < (lines.size() - 1)) {
+				cursorPos.y++;
+				fitCursorInLine();
+			}
+			debounce = 0.05f;
+		} else {
+			debounce -= ImGui::GetIO().DeltaTime;
+		}
+	}
+
+	if (ImGui::IsKeyDown(ImGuiKey_Backspace)) {
+		if (debounce < 0) {
+			if (cursorPos.x > 0) {
+				eraseChar(cursorPos.x - 1);
+				cursorPos.x--;
+			} else {
+				if (cursorPos.y > 0) {
+					eraseCurrentLine();
+				}
+			}
+			debounce = 0.05f;
+		} else {
+			debounce -= ImGui::GetIO().DeltaTime;
+		}
+	}
+}
+
 void TextEdit::update()
 {
-
 }
 
 void TextEdit::draw()
 {
+	ImGuiIO& io = ImGui::GetIO();
+
 	const ImVec2 calcText = ImGui::CalcTextSize("0000");
 	const float lineNumWidth = calcText.x;
 	const float lineHeight = calcText.y;
@@ -52,6 +180,9 @@ void TextEdit::draw()
 	ImGui::SetNextWindowContentSize(ImVec2 { rect.width, rect.height });
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2 { 0, 0 });
 	if (ImGui::Begin("DrawList")) {
+		handleCharInput();
+		handleKeyInput();
+
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 windowSize = ImGui::GetWindowSize();
 
@@ -80,6 +211,13 @@ void TextEdit::drawBackground(ImDrawList* draw, ImVec2 cursor)
 		ImVec2 { cursor.x, cursor.y }, 
 		ImVec2 { cursor.x + lineNumWidth, cursor.y + (lines.size() * lineHeight) }, 
 		ImColor(0.060f, 0.060f, 0.060f, 0.940f));
+
+	/*
+	draw->AddRectFilled(
+		ImVec2 { cursor.x + lineNumWidth, cursor.y + (lineHeight * cursorPos.y) + lineHeight }, 
+		ImVec2 { cursor.x + lineNumWidth + (ImGui::GetWindowWidth()), cursorPos.y + (cursorPos.y * lineHeight) + lineHeight }, 
+		ImColor(0.226f, 0.226f, 0.226f, 1.000f));
+	*/
 }
 
 void TextEdit::drawLines(ImDrawList* draw, ImVec2 cursor)

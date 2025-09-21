@@ -20,9 +20,17 @@ private:
 	Rectangle rect;
 	std::vector<Line> lines;
 	IntVec2 cursorPos;
+	float debounce;
 	void pushLine(std::string content);
 	char getCharAt(int index);
 	char getCurrentChar();
+	void putChar(char c);
+	void eraseChar(int index);
+	void eraseCurrentLine();
+	void fitCursorInLine();
+	int getLastCharIndex();
+	void handleCharInput();
+	void handleKeyInput();
 	void drawBackground(ImDrawList* draw, ImVec2 cursor);
 	void drawLines(ImDrawList* draw, ImVec2 cursor);
 	void drawCursor(ImDrawList* draw, ImVec2 cursor);
