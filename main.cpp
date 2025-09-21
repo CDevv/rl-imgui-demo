@@ -3,6 +3,7 @@
 #include "rlImGui.h"
 
 #include "sceneViewer.hpp"
+#include "textEdit.hpp"
 
 #include <string>
 #include <cstdio>
@@ -39,6 +40,7 @@ int main()
 	io.Fonts->AddFontFromFileTTF("./Karla-Regular.ttf", 15.0f);
 
 	SceneViewer scene(Rectangle { 20, 20, static_cast<float>(GetScreenWidth() / 2), static_cast<float>(GetScreenHeight() / 2) });
+	TextEdit textEdit;
 
 	//state
 	bool open = true;
@@ -46,6 +48,7 @@ int main()
 
 	while (!WindowShouldClose()) {
 		scene.update();
+		textEdit.update();
         
 		BeginDrawing();
 		ClearBackground(RAYWHITE);
@@ -65,6 +68,7 @@ int main()
 		}
 
 		scene.draw();
+		textEdit.draw();
 
 		rlImGuiEnd();
 		EndDrawing();
