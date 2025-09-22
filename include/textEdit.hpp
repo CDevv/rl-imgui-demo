@@ -15,17 +15,26 @@ struct Line {
 	std::string content;
 };
 
+struct VisiblityInfo {
+	int firstVisibleLine;
+	int lastVisibleLIne;
+};
+
 class TextEdit {
 private:
 	Rectangle rect;
 	std::vector<Line> lines;
 	IntVec2 cursorPos;
 	float debounce;
+	VisiblityInfo visibility;
+	void updateVisibilityInfo();
+	ImVec2 getMouseWindowPos();
 	void pushLine(std::string content);
 	char getCharAt(int index);
 	char getCurrentChar();
 	void putChar(char c);
 	void eraseChar(int index);
+	void insertLine(int index, std::string content);
 	void eraseCurrentLine();
 	void fitCursorInLine();
 	int getLastCharIndex();

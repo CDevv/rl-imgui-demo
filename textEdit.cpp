@@ -1,5 +1,6 @@
 #include "textEdit.hpp"
 #include <cstdio>
+#include <cmath>
 
 TextEdit::TextEdit() 
 {
@@ -8,6 +9,7 @@ TextEdit::TextEdit()
 	//resetCursor();
 	this->cursorPos = IntVec2 { 3, 1 };
 	this->debounce = 0.05f;
+	this->visibility = VisiblityInfo { 0, 0 };
 
 	pushLine("Hello1");
 	pushLine("Hello2");
@@ -20,6 +22,15 @@ TextEdit::TextEdit()
 void TextEdit::resetCursor()
 {
 	this->cursorPos = IntVec2 { 0, 0 };
+}
+
+ImVec2 TextEdit::getMouseWindowPos()
+{
+	ImVec2 mouseWindowPos = ImVec2 {
+		ImGui::GetMousePos().x - ImGui::GetCursorScreenPos().x,
+		ImGui::GetMousePos().y - ImGui::GetCursorScreenPos().y
+	};
+	return mouseWindowPos;
 }
 
 void TextEdit::pushLine(std::string content)
@@ -51,6 +62,13 @@ void TextEdit::eraseChar(int index)
 {
 	int currentLine = cursorPos.y;
 	lines.at(currentLine).content.erase(index, 1);
+}
+
+void TextEdit::insertLine(int index, std::string content)
+{
+	lines.insert(lines.begin() + index, Line {
+		content
+	});
 }
 
 void TextEdit::eraseCurrentLine()
@@ -92,8 +110,12 @@ void TextEdit::handleCharInput()
 
 void TextEdit::handleKeyInput()
 {
-	if (ImGui::IsKeyDown(ImGuiKey_LeftArrow)) {
-		if (debounce < 0) {
+	const ImVec2 calcText = ImGui::CalcTextSize("0000");
+	const float lineNumWidth = calcText.x;
+	const float lineHeight = calcText.y;
+
+	if (debounce < 0) {
+		if (ImGui::IsKeyDown(ImGuiKey_LeftArrow)) {
 			if (cursorPos.x > 0) {
 				cursorPos.x--;
 			} else {
@@ -102,14 +124,9 @@ void TextEdit::handleKeyInput()
 					cursorPos.x = getLastCharIndex();
 				}
 			}
-			debounce = 0.05f;
-		} else {
-			debounce -= ImGui::GetIO().DeltaTime;
 		}
-	}
 
-	if (ImGui::IsKeyDown(ImGuiKey_RightArrow)) {
-		if (debounce < 0) {
+		if (ImGui::IsKeyDown(ImGuiKey_RightArrow)) {
 			if (cursorPos.x < lines.at(cursorPos.y).content.size()) {
 				cursorPos.x++;
 			} else {
@@ -118,38 +135,31 @@ void TextEdit::handleKeyInput()
 					cursorPos.x = 0;
 				}
 			}
-			debounce = 0.05f;
-		} else {
-			debounce -= ImGui::GetIO().DeltaTime;
 		}
-	}
 
-	if (ImGui::IsKeyDown(ImGuiKey_UpArrow)) {
-		if (debounce < 0) {
+		if (ImGui::IsKeyDown(ImGuiKey_UpArrow)) {
 			if (cursorPos.y > 0) {
 				cursorPos.y--;
 				fitCursorInLine();
-			}
-			debounce = 0.05f;
-		} else {
-			debounce -= ImGui::GetIO().DeltaTime;
-		}
-	}
 
-	if (ImGui::IsKeyDown(ImGuiKey_DownArrow)) {
-		if (debounce < 0) {
+				if (cursorPos.y < visibility.firstVisibleLine) {
+					ImGui::SetScrollY(lineHeight * cursorPos.y);
+				}
+			}
+		}
+
+		if (ImGui::IsKeyDown(ImGuiKey_DownArrow)) {
 			if (cursorPos.y < (lines.size() - 1)) {
 				cursorPos.y++;
 				fitCursorInLine();
-			}
-			debounce = 0.05f;
-		} else {
-			debounce -= ImGui::GetIO().DeltaTime;
-		}
-	}
 
-	if (ImGui::IsKeyDown(ImGuiKey_Backspace)) {
-		if (debounce < 0) {
+				if (cursorPos.y > visibility.lastVisibleLIne) {
+					ImGui::SetScrollY(lineHeight * (visibility.firstVisibleLine + 1));
+				}
+			}
+		}
+
+		if (ImGui::IsKeyDown(ImGuiKey_Backspace)) {
 			if (cursorPos.x > 0) {
 				eraseChar(cursorPos.x - 1);
 				cursorPos.x--;
@@ -158,15 +168,81 @@ void TextEdit::handleKeyInput()
 					eraseCurrentLine();
 				}
 			}
-			debounce = 0.05f;
-		} else {
-			debounce -= ImGui::GetIO().DeltaTime;
+		}
+
+		if (ImGui::IsKeyDown(ImGuiKey_Enter)) {
+			std::string newLineContent = TextSubtext(lines.at(cursorPos.y).content.c_str(), cursorPos.x, 
+				(lines.at(cursorPos.y).content.size() - cursorPos.x));
+
+			lines.at(cursorPos.y).content.erase(cursorPos.x);
+			insertLine(cursorPos.y + 1, newLineContent);
+			cursorPos.y++;
+			cursorPos.x = 0;
+		}
+
+		debounce = 0.05f;
+	} else {
+		debounce -= ImGui::GetIO().DeltaTime;
+	}
+
+	if (ImGui::IsKeyPressed(ImGuiKey_MouseLeft, false)) {
+		printf("mouse left button! \n");
+
+		ImVec2 mouseWindowPos = getMouseWindowPos();
+		if (mouseWindowPos.x > lineNumWidth) {
+			//printf("%f \n", ImGui::GetScrollY());
+			//printf("%f \n", lineHeight);
+			printf("%f \n", (ImGui::GetScrollY() - (visibility.firstVisibleLine * lineHeight)) + mouseWindowPos.y);
+
+			float offsetY = (ImGui::GetScrollY() - (visibility.firstVisibleLine * lineHeight)) + mouseWindowPos.y;
+			int resultY = static_cast<int>(floor(offsetY / lineHeight));
+			int resultX = 0;
+
+			if (resultY >= lines.size() - 1) {
+				printf("%i \n", (lines.size() - 1 - resultY));
+				int addedY = static_cast<int>(lines.size() - 1 - resultY);
+				if (addedY < 0) {
+					addedY = 1;
+				}
+				resultY -= addedY;
+				printf("%i \n", resultY);
+			}
+
+			printf("%i \n", resultY);
+
+			int counter = 0;
+			std::string currentStr = "";
+			std::string lineContent = lines.at(resultY).content;
+			float mouseOffset = (mouseWindowPos.x - lineNumWidth);
+			for (int i = 0; i < lineContent.size(); i++) {
+				ImVec2 lineTextCalc = ImGui::CalcTextSize(currentStr.c_str());
+				if (lineTextCalc.x > mouseOffset) {
+					resultX = i;
+					break;
+				}
+				currentStr = currentStr.append(TextFormat("%c", lineContent.at(i)));
+			}
+
+			printf("%i \n", resultX);
+
+			cursorPos.y = resultY;
+			cursorPos.x = resultX - 1;
 		}
 	}
 }
 
 void TextEdit::update()
 {
+}
+
+void TextEdit::updateVisibilityInfo()
+{
+	const ImVec2 calcText = ImGui::CalcTextSize("0000");
+	const float lineHeight = calcText.y;
+
+	float scrollY = ImGui::GetScrollY();
+	visibility.firstVisibleLine = static_cast<int>((scrollY / lineHeight));
+	visibility.lastVisibleLIne = static_cast<int>(((scrollY + ImGui::GetWindowHeight() - 20) / lineHeight) - 1);
 }
 
 void TextEdit::draw()
@@ -182,6 +258,8 @@ void TextEdit::draw()
 	if (ImGui::Begin("DrawList")) {
 		handleCharInput();
 		handleKeyInput();
+
+		updateVisibilityInfo();
 
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 windowSize = ImGui::GetWindowSize();
@@ -211,13 +289,6 @@ void TextEdit::drawBackground(ImDrawList* draw, ImVec2 cursor)
 		ImVec2 { cursor.x, cursor.y }, 
 		ImVec2 { cursor.x + lineNumWidth, cursor.y + (lines.size() * lineHeight) }, 
 		ImColor(0.060f, 0.060f, 0.060f, 0.940f));
-
-	/*
-	draw->AddRectFilled(
-		ImVec2 { cursor.x + lineNumWidth, cursor.y + (lineHeight * cursorPos.y) + lineHeight }, 
-		ImVec2 { cursor.x + lineNumWidth + (ImGui::GetWindowWidth()), cursorPos.y + (cursorPos.y * lineHeight) + lineHeight }, 
-		ImColor(0.226f, 0.226f, 0.226f, 1.000f));
-	*/
 }
 
 void TextEdit::drawLines(ImDrawList* draw, ImVec2 cursor)
@@ -233,9 +304,17 @@ void TextEdit::drawLines(ImDrawList* draw, ImVec2 cursor)
 			IM_COL32_WHITE, line.content.c_str());
 		
 		float numTextWidth = ImGui::CalcTextSize(TextFormat("%i", index + 1)).x;
-		draw->AddText(ImVec2 
-			{ cursor.x + (lineNumWidth - numTextWidth), cursor.y + (index * lineHeight) }, 
-			IM_COL32_WHITE, TextFormat("%i", index + 1));
+
+		if (cursorPos.y == index) {
+			draw->AddText(ImVec2 
+				{ cursor.x + (lineNumWidth - numTextWidth), cursor.y + (index * lineHeight) }, 
+				ImColor(0.650f, 0.650f, 0.650f, 1.000f), TextFormat("%i", index + 1));
+		} else {
+			draw->AddText(ImVec2 
+				{ cursor.x + (lineNumWidth - numTextWidth), cursor.y + (index * lineHeight) }, 
+				IM_COL32_WHITE, TextFormat("%i", index + 1));
+		}
+		
 		index++;
 	}
 }
