@@ -34,6 +34,7 @@ private:
 	char getCurrentChar();
 	void putChar(char c);
 	void eraseChar(int index);
+	IntVec2 getPositionAtMouse();
 	void insertLine(int index, std::string content);
 	void eraseCurrentLine();
 	void fitCursorInLine();
