@@ -246,6 +246,10 @@ void TextEdit::handleKeyInput()
 		}
 	}
 
+	if (ImGui::IsKeyPressed(ImGuiKey_Tab, false)) {
+		putChar('\t');
+	}
+
 	if (ImGui::IsKeyPressed(ImGuiKey_Keypad7, false)) {
 		cursorPos.x = 0;
 	}
@@ -256,6 +260,34 @@ void TextEdit::handleKeyInput()
 
 	if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_V)) {
 		printf("paste cmd \n");
+		int count = 0;
+		char** clipLines = TextSplit(GetClipboardText(), '\n', &count);
+		if (count > 0) {
+			for (int i = 0; i < count; i++) {
+				printf("%s \n", clipLines[i]);
+			}
+
+			std::string firstHalf = TextSubtext(lines.at(cursorPos.y).content.c_str(), 0, cursorPos.x);
+			std::string secondHalf = TextSubtext(lines.at(cursorPos.y).content.c_str(), cursorPos.x, lines.at(cursorPos.y).content.size() - cursorPos.x);
+
+			lines.at(cursorPos.y).content = firstHalf;
+			lines.at(cursorPos.y).content.append(clipLines[0]);
+			cursorPos.x += strlen(clipLines[0]);
+			if (count == 2) {
+				insertLine(cursorPos.y + 1, std::string(TextFormat("%s%s", clipLines[1], secondHalf.c_str())));
+				cursorPos.x = strlen(clipLines[1]);
+				cursorPos.y++;
+			} else if (count >= 3) {
+				for (int j = 0; j < count - 2; j++) {
+					//printf("%i \n", j);
+					insertLine(cursorPos.y + 1, std::string(clipLines[1 + j]));
+					cursorPos.y++;
+				}
+				insertLine(cursorPos.y + 1, std::string(TextFormat("%s%s", clipLines[count - 1], secondHalf.c_str())));
+				cursorPos.x = strlen(clipLines[count - 1]);
+				cursorPos.y++;
+			}
+		}
 	}
 }
 
@@ -299,7 +331,7 @@ void TextEdit::draw()
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 windowSize = ImGui::GetWindowSize();
 
-		ImGui::BeginChild("content", ImVec2(windowSize.y, lines.size() * lineHeight), 0, ImGuiWindowFlags_HorizontalScrollbar);
+		ImGui::BeginChild("content", ImVec2(windowSize.x, lines.size() * lineHeight), 0, ImGuiWindowFlags_HorizontalScrollbar);
 
 		ImDrawList* draw = ImGui::GetWindowDrawList();
 		ImVec2 cursor = ImGui::GetCursorScreenPos();
